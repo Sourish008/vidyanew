@@ -1,32 +1,88 @@
 {
-  "name": "vidya-app",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
+  "name": "to-regex-range",
+  "description": "Pass two numbers, get a regex-compatible source string for matching ranges. Validated against more than 2.78 million test assertions.",
+  "version": "5.0.1",
+  "homepage": "https://github.com/micromatch/to-regex-range",
+  "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
+  "contributors": [
+    "Jon Schlinkert (http://twitter.com/jonschlinkert)",
+    "Rouven Weßling (www.rouvenwessling.de)"
+  ],
+  "repository": "micromatch/to-regex-range",
+  "bugs": {
+    "url": "https://github.com/micromatch/to-regex-range/issues"
+  },
+  "license": "MIT",
+  "files": [
+    "index.js"
+  ],
+  "main": "index.js",
+  "engines": {
+    "node": ">=8.0"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "test": "mocha"
   },
   "dependencies": {
-    "canvas-confetti": "^1.9.4",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.469.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.1",
-    "tailwind-merge": "^2.6.0"
+    "is-number": "^7.0.0"
   },
   "devDependencies": {
-    "@types/canvas-confetti": "^1.9.0",
-    "@types/node": "^22.10.2",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
-    "typescript": "~5.6.2",
-    "vite": "^6.0.5"
+    "fill-range": "^6.0.0",
+    "gulp-format-md": "^2.0.0",
+    "mocha": "^6.0.2",
+    "text-table": "^0.2.0",
+    "time-diff": "^0.3.1"
+  },
+  "keywords": [
+    "bash",
+    "date",
+    "expand",
+    "expansion",
+    "expression",
+    "glob",
+    "match",
+    "match date",
+    "match number",
+    "match numbers",
+    "match year",
+    "matches",
+    "matching",
+    "number",
+    "numbers",
+    "numerical",
+    "range",
+    "ranges",
+    "regex",
+    "regexp",
+    "regular",
+    "regular expression",
+    "sequence"
+  ],
+  "verb": {
+    "layout": "default",
+    "toc": false,
+    "tasks": [
+      "readme"
+    ],
+    "plugins": [
+      "gulp-format-md"
+    ],
+    "lint": {
+      "reflinks": true
+    },
+    "helpers": {
+      "examples": {
+        "displayName": "examples"
+      }
+    },
+    "related": {
+      "list": [
+        "expand-range",
+        "fill-range",
+        "micromatch",
+        "repeat-element",
+        "repeat-string"
+      ]
+    }
   }
 }
