@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Poppins', 'Inter', system-ui, -apple-system, sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  /* Accessible Focus Style Requirement */
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px #4f46e5, 0 0 0 4px rgba(79, 70, 229, 0.3) !important;
+  }
+}
+
+/* 1. Dynamic Text Scaling */
+html.text-scale-small {
+  font-size: 88%;
+}
+
+html.text-scale-large {
+  font-size: 120%;
+}
+
+/* 2. Dyslexia Mode */
+html.dyslexic-mode {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
+  letter-spacing: 0.05em !important;
+  word-spacing: 0.1em !important;
+}
+
+html.dyslexic-mode p,
+html.dyslexic-mode div,
+html.dyslexic-mode span {
+  line-height: 1.8 !important;
+}
+
+/* 3. High Contrast Mode */
+html.contrast-high {
+  filter: contrast(140%);
+}
+
+html.contrast-high body {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+html.contrast-high button,
+html.contrast-high a {
+  border: 2px solid #ffffff !important;
+}
+
+/* 4. Colorblind Theme Adaptations */
+html.theme-protanopia {
+  filter: hue-rotate(15deg) saturate(130%);
+}
+
+html.theme-deuteranopia {
+  filter: hue-rotate(-20deg) saturate(130%);
+}
+
+html.theme-tritanopia {
+  filter: hue-rotate(180deg) saturate(120%);
+}
+
+/* 5. Reduced Motion */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001s !important;
+  scroll-behavior: auto !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
