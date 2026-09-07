@@ -46,7 +46,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 shrink-0 transition-colors"
+      className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 pb-6 gap-4 shrink-0 transition-colors"
       aria-label="Main Application Sidebar"
     >
       {/* Brand Logo & Title */}
