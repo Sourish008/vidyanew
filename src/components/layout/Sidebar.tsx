@@ -38,7 +38,11 @@ export const Sidebar: React.FC = () => {
     { to: '/teacher/analytics', label: 'Teacher Analytics', icon: BarChart3 },
   ];
 
-  const links = role === 'teacher' ? teacherLinks : studentLinks;
+  // select links for role, remove sidebar accessibility duplicate, and dedupe by path
+  const rawLinks = role === 'teacher' ? teacherLinks : studentLinks;
+  const links = rawLinks
+    .filter((l) => l.to !== '/student/profile/accessibility')
+    .filter((l, i, arr) => arr.findIndex(x => x.to === l.to) === i);
 
   return (
     <aside
