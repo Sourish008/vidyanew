@@ -8,18 +8,20 @@
     scroll-behavior: smooth;
   }
 
-  /* Accessible Focus Style Requirement */
+  /* Accessible Focus Style Requirement - Better implementation */
   *:focus-visible {
-    outline: none !important;
-    box-shadow: 0 0 0 2px #4f46e5, 0 0 0 4px rgba(79, 70, 229, 0.3) !important;
+    outline: 2px solid #4f46e5 !important;
+    outline-offset: 2px !important;
   }
 }
+
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition; }
-  .btn-primary { @apply btn bg-indigo-600 text-white px-3 py-2 shadow-md hover:bg-indigo-500; }
-  .btn-secondary { @apply btn bg-slate-100 text-slate-800 px-3 py-2 hover:bg-slate-200; }
-  .btn-ghost { @apply btn bg-transparent text-slate-600 px-2 py-1 hover:bg-slate-100; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors; }
+  .btn-primary { @apply btn bg-indigo-600 text-white px-3 py-2 shadow-md hover:bg-indigo-500 focus-visible:outline-indigo-600; }
+  .btn-secondary { @apply btn bg-slate-100 text-slate-800 px-3 py-2 hover:bg-slate-200 focus-visible:outline-slate-600; }
+  .btn-ghost { @apply btn bg-transparent text-slate-600 px-2 py-1 hover:bg-slate-100 focus-visible:outline-slate-600; }
 }
+
 /* 1. Dynamic Text Scaling */
 html.text-scale-small {
   font-size: 88%;
@@ -42,7 +44,7 @@ html.dyslexic-mode span {
   line-height: 1.8 !important;
 }
 
-/* 3. High Contrast Mode */
+/* 3. High Contrast Mode - Improved */
 html.contrast-high {
   filter: contrast(140%);
 }
@@ -55,9 +57,10 @@ html.contrast-high body {
 html.contrast-high button,
 html.contrast-high a {
   border: 2px solid #ffffff !important;
+  padding: 8px 12px;
 }
 
-/* 4. Colorblind Theme Adaptations */
+/* 4. Colorblind Theme Adaptations - NOTE: Consider adding semantic color classes instead */
 html.theme-protanopia {
   filter: hue-rotate(15deg) saturate(130%);
 }
@@ -70,13 +73,13 @@ html.theme-tritanopia {
   filter: hue-rotate(180deg) saturate(120%);
 }
 
-/* 5. Reduced Motion */
+/* 5. Reduced Motion - Fixed */
 html.reduce-motion *,
 html.reduce-motion *::before,
 html.reduce-motion *::after {
-  animation-duration: 0.001s !important;
+  animation-duration: 0s !important;
   animation-iteration-count: 1 !important;
-  transition-duration: 0.001s !important;
+  transition-duration: 0s !important;
   scroll-behavior: auto !important;
 }
 
@@ -98,6 +101,7 @@ html.reduce-motion *::after {
 .animate-slideUp {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
 /* Prevent horizontal overflow globally and make rich content responsive */
 html, body, #root {
   overflow-x: hidden;
