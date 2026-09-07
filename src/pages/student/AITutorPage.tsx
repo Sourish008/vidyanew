@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import katex from 'katex';
 import { Shell } from '../../components/layout/Shell';
 import { useData } from '../../context/DataContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -16,177 +22,85 @@ import {
   Check,
   AlertCircle,
   User,
-  Loader,
 } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
-  sender: 'user' | 'ai' | 'error';
+  sender: 'user' | 'ai';
   text: string;
   data?: AIChatOutput;
 }
 
-// Sanitize HTML to prevent XSS attacks
-const sanitizeHtml = (html: string): string => {
-  const div = document.createElement('div');
-  div.textContent = html;
-  return div.innerHTML;
-};
+// Lightweight renderer: converts basic Markdown (headings, bold, lists)
+// and renders LaTeX math ($...$ and $$...$$) using KaTeX to cleanly display formulas.
+function escapeHtml(str: string) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-// Memoized chat message component for better performance
-const ChatMessage: React.FC<{
-  msg: ChatMessage;
-  isSaved: boolean;
-  onListen: (text: string) => void;
-  onSave: (msgId: string, title: string, content: string) => void;
-  onFollowup: (text: string) => void;
-  isLoading: boolean;
-}> = React.memo(({ msg, isSaved, onListen, onSave, onFollowup, isLoading }) => {
-  return (
-    <div
-      className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-    >
-      {msg.sender === 'ai' && (
-        <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
-          <Bot className="w-5 h-5" />
-        </div>
-      )}
+function renderAIContentToHtml(input: string) {
+  if (!input) return '';
 
-      {msg.sender === 'error' && (
-        <div className="w-9 h-9 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md">
-          <AlertCircle className="w-5 h-5" />
-        </div>
-      )}
+  let html = input;
 
-      <div className={`max-w-2xl space-y-3 ${msg.sender === 'user' ? 'items-end' : ''}`}>
-        <div
-          className={`p-5 rounded-3xl shadow-sm text-sm ${
-            msg.sender === 'user'
-              ? 'bg-indigo-600 text-white font-medium rounded-tr-none'
-              : msg.sender === 'error'
-              ? 'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-tl-none'
-              : 'bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-none'
-          }`}
-        >
-          {msg.sender === 'user' ? (
-            <p>{msg.text}</p>
-          ) : (
-            <div className="space-y-4">
-              {/* Document-styled content rendering */}
-              <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-line">
-                {msg.text}
-              </div>
+  // Render block math $$...$$ first
+  html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_m, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false });
+    } catch (e) {
+      return `<pre>${escapeHtml(expr)}</pre>`;
+    }
+  });
 
-              {/* MathML Display if formula present */}
-              {msg.data?.mathMl && (
-                <div className="p-4 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-900 text-center my-2">
-                  <div
-                    className="text-xl font-serif"
-                    dangerouslySetInnerHTML={{ __html: msg.data.mathMl }}
-                    role="img"
-                    aria-label="Mathematical formula"
-                  />
-                </div>
-              )}
+  // Render inline math $...$
+  html = html.replace(/\$([^$\n]+?)\$/g, (_m, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false });
+    } catch (e) {
+      return `<code>${escapeHtml(expr)}</code>`;
+    }
+  });
 
-              {/* Structured Table Display if present */}
-              {msg.data?.tableData && (
-                <div className="overflow-x-auto my-3 border border-slate-200 dark:border-slate-700 rounded-2xl">
-                  <table className="w-full text-xs text-left" role="table">
-                    <thead className="bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white font-bold">
-                      <tr>
-                        {msg.data.tableData.headers.map((h, i) => (
-                          <th key={`header-${i}`} className="p-2.5">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                      {msg.data.tableData.rows.map((row, rIdx) => (
-                        <tr key={`row-${rIdx}`}>
-                          {row.map((cell, cIdx) => (
-                            <td key={`cell-${rIdx}-${cIdx}`} className="p-2.5 text-slate-700 dark:text-slate-300">
-                              {cell}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+  // Basic markdown conversions: headings, bold, lists, paragraphs
+  // Headings: ###, ##, #
+  html = html.replace(/^###\s*(.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^##\s*(.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^#\s*(.+)$/gm, '<h1>$1</h1>');
 
-              {/* Uncertainty Warning Box if applicable */}
-              {msg.data?.uncertaintyWarning && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 text-amber-800 dark:text-amber-300 rounded-xl text-xs flex items-center gap-2 font-medium">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{msg.data.uncertaintyWarning}</span>
-                </div>
-              )}
+  // Normalize heading levels: promote first H3 to H2 to avoid skipping from page H1 -> H3
+  html = html.replace(/<h3>/, '<h2>');
 
-              {/* Response Action Bar (Listen, Save, Followups) */}
-              {msg.sender === 'ai' && (
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onListen(msg.text)}
-                      aria-label="Listen to AI response"
-                      className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold rounded-lg flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" /> Listen
-                    </button>
+  // Bold **text**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
-                    <button
-                      onClick={() => onSave(msg.id, 'AI Tutor Solution', msg.text)}
-                      aria-label={isSaved ? 'Message saved' : 'Save message to notes'}
-                      className="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-lg flex items-center gap-1 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
-                    >
-                      {isSaved ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-500" /> Saved
-                        </>
-                      ) : (
-                        <>
-                          <Bookmark className="w-3.5 h-3.5 text-indigo-600" /> Save Note
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+  // Unordered lists: lines starting with - or *
+  // Convert consecutive list lines into a single <ul>
+  html = html.replace(/(^((?:[-*]\s+.+\n?)+))/gm, (m) => {
+    const items = m
+      .trim()
+      .split(/\n+/)
+      .map((l) => l.replace(/^[-*]\s+/, ''))
+      .map((li) => `<li>${li}</li>`)
+      .join('');
+    return `<ul>${items}</ul>`;
+  });
 
-        {/* Suggested Followups */}
-        {msg.data?.suggestedFollowups && msg.data.suggestedFollowups.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {msg.data.suggestedFollowups.map((f, fIdx) => (
-              <button
-                key={`followup-${msg.id}-${fIdx}`}
-                onClick={() => onFollowup(f)}
-                disabled={isLoading}
-                aria-label={`Ask follow-up question: ${f}`}
-                className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-700 dark:text-slate-300 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 disabled:opacity-50 transition"
-              >
-                ⚡ {f}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+  // Preserve existing line breaks into paragraphs
+  html = html
+    .split(/\n\s*\n/)
+    .map((block) => {
+      // if the block already contains block-level tags, keep it
+      if (/^\s*<h|<ul|<pre|<h1|<h2|<h3|<table/.test(block)) return block;
+      return `<p>${block.replace(/\n/g, '<br/>')}</p>`;
+    })
+    .join('');
 
-      {msg.sender === 'user' && (
-        <div className="w-9 h-9 rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0">
-          <User className="w-5 h-5" />
-        </div>
-      )}
-    </div>
-  );
-});
-
-ChatMessage.displayName = 'ChatMessage';
+  return html;
+}
 
 export const AITutorPage: React.FC = () => {
   const { saveNote } = useData();
@@ -222,30 +136,9 @@ I can assist you with:
 
   const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(new Set());
 
-  // Cleanup TTS on component unmount
-  useEffect(() => {
-    return () => {
-      if (ttsService && typeof ttsService.stop === 'function') {
-        ttsService.stop();
-        setIsReading(false);
-      }
-    };
-  }, [setIsReading]);
-
   const handleSend = async (userText?: string) => {
     const textToSend = userText || inputMsg;
     if (!textToSend.trim() || loading) return;
-
-    // Validate profile exists
-    if (!profile || !profile.preferredSupport) {
-      const errorMsg: ChatMessage = {
-        id: `err_${Date.now()}`,
-        sender: 'error',
-        text: '❌ User profile not loaded. Please refresh the page.',
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-      return;
-    }
 
     const userMsg: ChatMessage = {
       id: `u_${Date.now()}`,
@@ -272,69 +165,172 @@ I can assist you with:
 
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
-      console.error('AI Service Error:', err);
-      const errorMsg: ChatMessage = {
-        id: `err_${Date.now()}`,
-        sender: 'error',
-        text: '❌ Sorry, I encountered an error while processing your request. Please try again or contact support if the issue persists.',
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleListen = (text: string) => {
-    if (!profile) {
-      console.warn('Profile not available for TTS');
-      return;
-    }
     setIsReading(true);
-    const readingSpeed = profile.readingSpeed || 1.0;
-    ttsService.speak(text, readingSpeed, undefined, () => setIsReading(false));
+    ttsService.speak(text, profile.readingSpeed || 1.0, undefined, () => setIsReading(false));
   };
 
   const handleSaveToNotes = (msgId: string, title: string, content: string) => {
-    if (!saveNote) {
-      console.warn('saveNote function not available');
-      return;
-    }
     saveNote(title, content, 'ai_tutor');
     setSavedMessageIds((prev) => new Set(prev).add(msgId));
   };
 
   return (
     <Shell title="AI Tutor Workspace">
-      <div className="max-w-4xl mx-auto space-y-6 flex flex-col h-[calc(100vh-12rem)]">
+      <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-0 space-y-6 flex flex-col h-[calc(100vh-12rem)] overflow-x-hidden">
         {/* Chat Messages Container */}
-        <div className="flex-1 overflow-y-auto p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
-              <p>Start a conversation with Vidya AI Tutor</p>
+        <div className="flex-1 w-full min-w-0 overflow-y-auto overflow-x-hidden p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex gap-3 w-full min-w-0 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              {msg.sender === 'ai' && (
+                <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Bot className="w-5 h-5" />
+                </div>
+              )}
+
+              <div className={`w-full max-w-full sm:max-w-2xl space-y-3 min-w-0 ${msg.sender === 'user' ? 'items-end' : ''}`}>
+                <div
+                  className={`p-5 rounded-3xl shadow-sm text-sm break-words max-w-full ${
+                    msg.sender === 'user'
+                      ? 'bg-indigo-600 text-white font-medium rounded-tr-none'
+                      : 'bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-none'
+                  }`}
+                >
+                  {msg.sender === 'user' ? (
+                    <p>{msg.text}</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Document-styled content rendering */}
+                      <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed break-words">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: renderAIContentToHtml(msg.text),
+                          }}
+                        />
+                      </div>
+
+                      {/* MathML Display if formula present */}
+                      {msg.data?.mathMl && (
+                        <div className="p-4 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-900 text-center my-2">
+                          <div
+                            className="text-xl font-serif"
+                            dangerouslySetInnerHTML={{ __html: msg.data.mathMl }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Structured Table Display if present */}
+                      {msg.data?.tableData && (
+                        <div className="overflow-x-auto my-3 border border-slate-200 dark:border-slate-700 rounded-2xl">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white font-bold">
+                              <tr>
+                                {msg.data.tableData.headers.map((h, i) => (
+                                  <th key={i} className="p-2.5">
+                                    {h}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                              {msg.data.tableData.rows.map((row, rIdx) => (
+                                <tr key={rIdx}>
+                                  {row.map((cell, cIdx) => (
+                                    <td key={cIdx} className="p-2.5 text-slate-700 dark:text-slate-300">
+                                      {cell}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* Uncertainty Warning Box if applicable */}
+                      {msg.data?.uncertaintyWarning && (
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 text-amber-800 dark:text-amber-300 rounded-xl text-xs flex items-center gap-2 font-medium">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{msg.data.uncertaintyWarning}</span>
+                        </div>
+                      )}
+
+                      {/* Response Action Bar (Listen, Save, Followups) */}
+                      {msg.sender === 'ai' && (
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleListen(msg.text)}
+                              className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold rounded-lg flex items-center gap-1 hover:bg-indigo-100 transition"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" /> Listen
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                handleSaveToNotes(msg.id, 'AI Tutor Solution', msg.text)
+                              }
+                              className="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-lg flex items-center gap-1 hover:bg-slate-200 transition"
+                            >
+                              {savedMessageIds.has(msg.id) ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Saved
+                                </>
+                              ) : (
+                                <>
+                                  <Bookmark className="w-3.5 h-3.5 text-indigo-600" /> Save Note
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Suggested Followups */}
+                {msg.data?.suggestedFollowups && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {msg.data.suggestedFollowups.map((f, fIdx) => (
+                      <button
+                        key={fIdx}
+                        onClick={() => handleSend(f)}
+                        className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-700 dark:text-slate-300 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 transition"
+                      >
+                        ⚡ {f}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {msg.sender === 'user' && (
+                <div className="w-9 h-9 rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5" />
+                </div>
+              )}
             </div>
-          ) : (
-            messages.map((msg) => (
-              <ChatMessage
-                key={msg.id}
-                msg={msg}
-                isSaved={savedMessageIds.has(msg.id)}
-                onListen={handleListen}
-                onSave={handleSaveToNotes}
-                onFollowup={handleSend}
-                isLoading={loading}
-              />
-            ))
-          )}
+          ))}
 
           {loading && (
-            <div className="flex items-center gap-2 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl w-auto max-w-xs animate-pulse text-xs font-semibold text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-2 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl w-48 animate-pulse text-xs font-semibold text-slate-500">
               <Bot className="w-4 h-4 text-indigo-600 animate-spin" /> Vidya AI is thinking...
             </div>
           )}
         </div>
 
         {/* Input Composer Bar */}
-        <div className="p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md">
+            <div className="p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -344,10 +340,8 @@ I can assist you with:
           >
             <button
               type="button"
-              aria-label="Open voice input assistant"
               onClick={() => setIsVoiceModalOpen(true)}
-              className="p-3 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50"
-              disabled={loading}
+              className="p-3 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               title="Voice Input Assistant"
             >
               <Mic className="w-5 h-5" />
@@ -358,23 +352,15 @@ I can assist you with:
               value={inputMsg}
               onChange={(e) => setInputMsg(e.target.value)}
               placeholder="Ask Vidya anything about your lessons, math formulas, or physics laws..."
-              className="flex-1 px-3 py-2 bg-transparent text-sm text-slate-900 dark:text-white focus:outline-none disabled:opacity-50"
-              disabled={loading}
-              aria-label="Chat input field"
+              className="flex-1 min-w-0 px-3 py-2 bg-transparent text-sm text-slate-900 dark:text-white focus:outline-none"
             />
 
             <button
               type="submit"
               disabled={!inputMsg.trim() || loading}
-              aria-label={loading ? 'Processing request' : 'Send message'}
-              className="p-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md shadow-indigo-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center"
-              title="Send message"
+              className="p-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md shadow-indigo-600/30 disabled:opacity-40 transition"
             >
-              {loading ? (
-                <Loader className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
+              <Send className="w-4 h-4" />
             </button>
           </form>
         </div>
