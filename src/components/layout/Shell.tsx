@@ -35,7 +35,7 @@ export const Shell: React.FC<ShellProps> = ({ children, title }) => {
   }, [location.pathname, profile.voiceNavigation]);
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors relative">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors relative overflow-x-hidden">
       {/* Sidebar Navigation for Desktop */}
       <Sidebar />
 
