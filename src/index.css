@@ -15,6 +15,13 @@
   }
 }
 
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition; }
+  .btn-primary { @apply btn bg-indigo-600 text-white px-3 py-2 shadow-md hover:bg-indigo-500; }
+  .btn-secondary { @apply btn bg-slate-100 text-slate-800 px-3 py-2 hover:bg-slate-200; }
+  .btn-ghost { @apply btn bg-transparent text-slate-600 px-2 py-1 hover:bg-slate-100; }
+}
+
 /* 1. Dynamic Text Scaling */
 html.text-scale-small {
   font-size: 88%;
@@ -92,4 +99,25 @@ html.reduce-motion *::after {
 
 .animate-slideUp {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Prevent horizontal overflow globally and make rich content responsive */
+html, body, #root {
+  overflow-x: hidden;
+}
+
+main, .min-w-0 {
+  overflow-x: hidden;
+}
+
+.prose img,
+.prose table {
+  max-width: 100%;
+  width: auto;
+}
+
+.prose pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

@@ -38,11 +38,15 @@ export const Sidebar: React.FC = () => {
     { to: '/teacher/analytics', label: 'Teacher Analytics', icon: BarChart3 },
   ];
 
-  const links = role === 'teacher' ? teacherLinks : studentLinks;
+  // select links for role, remove sidebar accessibility duplicate, and dedupe by path
+  const rawLinks = role === 'teacher' ? teacherLinks : studentLinks;
+  const links = rawLinks
+    .filter((l) => l.to !== '/student/profile/accessibility')
+    .filter((l, i, arr) => arr.findIndex(x => x.to === l.to) === i);
 
   return (
     <aside
-      className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 shrink-0 transition-colors"
+      className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 pb-6 gap-4 shrink-0 transition-colors"
       aria-label="Main Application Sidebar"
     >
       {/* Brand Logo & Title */}
@@ -51,17 +55,13 @@ export const Sidebar: React.FC = () => {
           <Sparkles className="w-6 h-6" />
         </div>
         <div>
-          <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
-            Vidya
-          </span>
-          <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-            Inclusive EdTech
-          </span>
+          <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">Vidya</span>
+          <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500 normal-case tracking-widest">Inclusive EdTech</span>
         </div>
       </Link>
 
       {/* Navigation Items */}
-      <nav className="flex-1 space-y-1.5">
+      <nav className="flex-1 space-y-1.5" aria-label="Primary">
         {links.map((link) => {
           const Icon = link.icon;
           return (
@@ -69,22 +69,27 @@ export const Sidebar: React.FC = () => {
               key={link.to}
               to={link.to}
               end={link.end}
+              title={link.label}
               className={({ isActive }) =>
-                `flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                `flex items-center justify-between px-3.5 py-2.5 min-h-[40px] rounded-xl font-medium text-sm transition-all ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`
-              }
-            >
-              <div className="flex items-center gap-3">
-                <Icon className="w-5 h-5" />
-                <span>{link.label}</span>
-              </div>
-              {link.badge && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                  {link.badge}
-                </span>
+                }
+              >
+              {({ isActive }) => (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-5 h-5" />
+                    <span className="truncate max-w-[11rem]">{link.label}</span>
+                  </div>
+                  {link.badge && !isActive && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                      {link.badge}
+                    </span>
+                  )}
+                </>
               )}
             </NavLink>
           );
@@ -96,9 +101,7 @@ export const Sidebar: React.FC = () => {
         <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
           <span>Accessibility First</span>
         </p>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
-          WCAG 2.2 AA compliant. Every learner belongs.
-        </p>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">WCAG 2.2 AA compliant. Every learner belongs.</p>
       </div>
     </aside>
   );

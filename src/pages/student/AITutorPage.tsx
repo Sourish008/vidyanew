@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import katex from 'katex';
 import { Shell } from '../../components/layout/Shell';
 import { useData } from '../../context/DataContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -23,6 +29,77 @@ interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   data?: AIChatOutput;
+}
+
+// Lightweight renderer: converts basic Markdown (headings, bold, lists)
+// and renders LaTeX math ($...$ and $$...$$) using KaTeX to cleanly display formulas.
+function escapeHtml(str: string) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderAIContentToHtml(input: string) {
+  if (!input) return '';
+
+  let html = input;
+
+  // Render block math $$...$$ first
+  html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_m, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false });
+    } catch (e) {
+      return `<pre>${escapeHtml(expr)}</pre>`;
+    }
+  });
+
+  // Render inline math $...$
+  html = html.replace(/\$([^$\n]+?)\$/g, (_m, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false });
+    } catch (e) {
+      return `<code>${escapeHtml(expr)}</code>`;
+    }
+  });
+
+  // Basic markdown conversions: headings, bold, lists, paragraphs
+  // Headings: ###, ##, #
+  html = html.replace(/^###\s*(.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^##\s*(.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^#\s*(.+)$/gm, '<h1>$1</h1>');
+
+  // Normalize heading levels: promote first H3 to H2 to avoid skipping from page H1 -> H3
+  html = html.replace(/<h3>/, '<h2>');
+
+  // Bold **text**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  // Unordered lists: lines starting with - or *
+  // Convert consecutive list lines into a single <ul>
+  html = html.replace(/(^((?:[-*]\s+.+\n?)+))/gm, (m) => {
+    const items = m
+      .trim()
+      .split(/\n+/)
+      .map((l) => l.replace(/^[-*]\s+/, ''))
+      .map((li) => `<li>${li}</li>`)
+      .join('');
+    return `<ul>${items}</ul>`;
+  });
+
+  // Preserve existing line breaks into paragraphs
+  html = html
+    .split(/\n\s*\n/)
+    .map((block) => {
+      // if the block already contains block-level tags, keep it
+      if (/^\s*<h|<ul|<pre|<h1|<h2|<h3|<table/.test(block)) return block;
+      return `<p>${block.replace(/\n/g, '<br/>')}</p>`;
+    })
+    .join('');
+
+  return html;
 }
 
 export const AITutorPage: React.FC = () => {
@@ -106,13 +183,13 @@ I can assist you with:
 
   return (
     <Shell title="AI Tutor Workspace">
-      <div className="max-w-4xl mx-auto space-y-6 flex flex-col h-[calc(100vh-12rem)]">
+      <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-0 space-y-6 flex flex-col h-[calc(100vh-12rem)] overflow-x-hidden">
         {/* Chat Messages Container */}
-        <div className="flex-1 overflow-y-auto p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="flex-1 w-full min-w-0 overflow-y-auto overflow-x-hidden p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex gap-3 w-full min-w-0 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.sender === 'ai' && (
                 <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
@@ -120,9 +197,9 @@ I can assist you with:
                 </div>
               )}
 
-              <div className={`max-w-2xl space-y-3 ${msg.sender === 'user' ? 'items-end' : ''}`}>
+              <div className={`w-full max-w-full sm:max-w-2xl space-y-3 min-w-0 ${msg.sender === 'user' ? 'items-end' : ''}`}>
                 <div
-                  className={`p-5 rounded-3xl shadow-sm text-sm ${
+                  className={`p-5 rounded-3xl shadow-sm text-sm break-words max-w-full ${
                     msg.sender === 'user'
                       ? 'bg-indigo-600 text-white font-medium rounded-tr-none'
                       : 'bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-none'
@@ -133,8 +210,12 @@ I can assist you with:
                   ) : (
                     <div className="space-y-4">
                       {/* Document-styled content rendering */}
-                      <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-line">
-                        {msg.text}
+                      <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed break-words">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: renderAIContentToHtml(msg.text),
+                          }}
+                        />
                       </div>
 
                       {/* MathML Display if formula present */}
@@ -249,7 +330,7 @@ I can assist you with:
         </div>
 
         {/* Input Composer Bar */}
-        <div className="p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md">
+            <div className="p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -271,7 +352,7 @@ I can assist you with:
               value={inputMsg}
               onChange={(e) => setInputMsg(e.target.value)}
               placeholder="Ask Vidya anything about your lessons, math formulas, or physics laws..."
-              className="flex-1 px-3 py-2 bg-transparent text-sm text-slate-900 dark:text-white focus:outline-none"
+              className="flex-1 min-w-0 px-3 py-2 bg-transparent text-sm text-slate-900 dark:text-white focus:outline-none"
             />
 
             <button
